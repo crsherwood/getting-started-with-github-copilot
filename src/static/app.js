@@ -20,20 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Participants markup with delete icon
-        let participantsMarkup = '';
-        if (details.participants && details.participants.length) {
-          participantsMarkup = `<ul class="participant-list">` +
-            details.participants.map(p =>
-              `<li data-activity="${encodeURIComponent(name)}" data-email="${encodeURIComponent(p)}">
-                <span class="participant-name">${p}</span>
-                <button class="delete-participant" title="Unregister" aria-label="Unregister ${p}">🗑️</button>
-              </li>`
-            ).join("") + `</ul>`;
-        } else {
-          participantsMarkup = `<p class="no-participants">No participants yet</p>`;
-        }
-
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
@@ -41,21 +27,38 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
           <div class="participants">
             <h5>Participants</h5>
-            ${participantsMarkup}
           </div>
         `;
 
-        // Add event listeners for delete buttons after rendering
-        setTimeout(() => {
-          activityCard.querySelectorAll('.delete-participant').forEach(btn => {
+        // Create participants section with proper escaping
+        const participantsDiv = activityCard.querySelector('.participants');
+        if (details.participants && details.participants.length) {
+          const ul = document.createElement('ul');
+          ul.className = 'participant-list';
+          
+          details.participants.forEach(email => {
+            const li = document.createElement('li');
+            li.setAttribute('data-activity', name);
+            li.setAttribute('data-email', email);
+            
+            const span = document.createElement('span');
+            span.className = 'participant-name';
+            span.textContent = email; // Use textContent to prevent XSS
+            
+            const btn = document.createElement('button');
+            btn.className = 'delete-participant';
+            btn.title = 'Unregister';
+            btn.setAttribute('aria-label', `Unregister ${email}`);
+            btn.textContent = '🗑️';
+            
+            // Attach event listener directly without setTimeout
             btn.addEventListener('click', async function(e) {
               e.preventDefault();
-              const li = btn.closest('li');
-              const activityName = decodeURIComponent(li.getAttribute('data-activity'));
-              const email = decodeURIComponent(li.getAttribute('data-email'));
-              if (confirm(`Unregister ${email} from ${activityName}?`)) {
+              const activityName = li.getAttribute('data-activity');
+              const participantEmail = li.getAttribute('data-email');
+              if (confirm(`Unregister ${participantEmail} from ${activityName}?`)) {
                 try {
-                  const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, { method: 'POST' });
+                  const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(participantEmail)}`, { method: 'POST' });
                   if (response.ok) {
                     fetchActivities(); // Refresh activities list after unregister
                   } else {
@@ -66,8 +69,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
               }
             });
+            
+            li.appendChild(span);
+            li.appendChild(btn);
+            ul.appendChild(li);
           });
-        }, 0);
+          
+          participantsDiv.appendChild(ul);
+        } else {
+          const p = document.createElement('p');
+          p.className = 'no-participants';
+          p.textContent = 'No participants yet';
+          participantsDiv.appendChild(p);
+        }
 
         activitiesList.appendChild(activityCard);
 
