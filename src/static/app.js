@@ -20,11 +20,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Participants markup
-        const participantsMarkup =
-          details.participants && details.participants.length
-            ? `<ul class="participant-list">${details.participants.map(p => `<li>${p}</li>`).join("")}</ul>`
-            : `<p class="no-participants">No participants yet</p>`;
+        // Participants markup with delete icon
+        let participantsMarkup = '';
+        if (details.participants && details.participants.length) {
+          participantsMarkup = `<ul class="participant-list">` +
+            details.participants.map(p =>
+              `<li data-activity="${encodeURIComponent(name)}" data-email="${encodeURIComponent(p)}">
+                <span class="participant-name">${p}</span>
+                <button class="delete-participant" title="Unregister" aria-label="Unregister ${p}">🗑️</button>
+              </li>`
+            ).join("") + `</ul>`;
+        } else {
+          participantsMarkup = `<p class="no-participants">No participants yet</p>`;
+        }
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
@@ -36,6 +44,30 @@ document.addEventListener("DOMContentLoaded", () => {
             ${participantsMarkup}
           </div>
         `;
+
+        // Add event listeners for delete buttons after rendering
+        setTimeout(() => {
+          activityCard.querySelectorAll('.delete-participant').forEach(btn => {
+            btn.addEventListener('click', async function(e) {
+              e.preventDefault();
+              const li = btn.closest('li');
+              const activityName = decodeURIComponent(li.getAttribute('data-activity'));
+              const email = decodeURIComponent(li.getAttribute('data-email'));
+              if (confirm(`Unregister ${email} from ${activityName}?`)) {
+                try {
+                  const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, { method: 'POST' });
+                  if (response.ok) {
+                    fetchActivities(); // Refresh activities list after unregister
+                  } else {
+                    alert('Failed to unregister participant.');
+                  }
+                } catch (err) {
+                  alert('Error occurred while unregistering.');
+                }
+              }
+            });
+          });
+        }, 0);
 
         activitiesList.appendChild(activityCard);
 
@@ -72,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh activities list after signup
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
